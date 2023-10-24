@@ -1,0 +1,8 @@
+setup.py
+Twotuples/Twotuples.py
+Twotuples/__init__.py
+Twotuples.egg-info/PKG-INFO
+Twotuples.egg-info/SOURCES.txt
+Twotuples.egg-info/dependency_links.txt
+Twotuples.egg-info/requires.txt
+Twotuples.egg-info/top_level.txt

@@ -1,0 +1,2 @@
+from Twotuples.Twotuples import PysentimentClasificator,TraduccionText,VaderClasificator,AsentClasificator,difuso_clasificator,Metric
+
