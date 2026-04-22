@@ -1,6 +1,9 @@
 nltk
 transformers[sentencepiece]
+transformers
 spacy
+asent
+pysentimiento
 scikit-learn
 numpy
 pandas
