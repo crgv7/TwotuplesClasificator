@@ -3,11 +3,11 @@ from setuptools import find_packages, setup
 
 HERE = pathlib.Path(__file__).parent
 
-VERSION = '1.2.0' #Muy importante, deberéis ir cambiando la versión de vuestra librería según incluyáis nuevas funcionalidades
+VERSION = '1.3.1' #Muy importante, deberéis ir cambiando la versión de vuestra librería según incluyáis nuevas funcionalidades
 PACKAGE_NAME = 'Twotuples' #Debe coincidir con el nombre de la carpeta 
 AUTHOR = 'Carlos Garcia Vargas y Orlando Toledano' #Modificar con vuestros datos
 AUTHOR_EMAIL = '' #Modificar con vuestros datos
-URL = '' #Modificar con vuestros datos
+URL = 'https://github.com/crgv7/TwotuplesClasificator' #Modificar con vuestros datos
 
 LICENSE = 'MIT' #Tipo de licencia
 DESCRIPTION = 'Libreria para clasificar texto' #Descripción corta

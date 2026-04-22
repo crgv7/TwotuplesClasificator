@@ -1,5 +1,8 @@
 # Twotuples: Clasificador de Texto con Lógica Difusa
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/crgv7/TwotuplesClasificator)
+
+
 La librería **twotuples** tiene como objetivo clasificar opiniones o comentarios en tres categorías: positivo (POS), negativo (NEG) o neutral (NEU). 
 
 A diferencia de otras librerías de procesamiento de lenguaje natural (NLP), **twotuples** utiliza tres clasificadores de texto robustos internamente y combina sus resultados utilizando un **clasificador difuso basado en el modelo de 2-tuplas lingüísticas**, ofreciendo resultados más precisos y de consenso.
