@@ -11,19 +11,22 @@ URL = '' #Modificar con vuestros datos
 
 LICENSE = 'MIT' #Tipo de licencia
 DESCRIPTION = 'Libreria para clasificar texto' #Descripción corta
-LONG_DESCRIPTION = (HERE / "README.md").read_text(encoding='utf-8') #Referencia al documento README con una descripción más elaborada
+LONG_DESCRIPTION = (HERE / "Readme.md").read_text(encoding='utf-8') #Referencia al documento README con una descripción más elaborada
 LONG_DESC_TYPE = "text/markdown"
 '''
 transformers accelerate
 asent
-pysentimeinto 
+pysentimiento 
 '''
 
 #Paquetes necesarios para que funcione la libreía. Se instalarán a la vez si no lo tuvieras ya instalado
 INSTALL_REQUIRES = [
  'nltk',
  'transformers[sentencepiece]',
+ 'transformers',
  'spacy',
+ 'asent',
+ 'pysentimiento',
  'scikit-learn',
  'numpy',
  'pandas',   
