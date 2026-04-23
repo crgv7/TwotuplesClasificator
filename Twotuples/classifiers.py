@@ -1,6 +1,7 @@
 import pandas as pd
 from pysentimiento import create_analyzer
 import torch
+import torch.nn as nn
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import spacy
 import asent
@@ -12,6 +13,14 @@ print(f"Dispositivo de procesamiento detectado: {device}")
 def PysentimentClasificator(texts: list) -> list:
     print("[Pysentimiento] Iniciando carga de modelo...")
     analyzer = create_analyzer(task="sentiment", lang="es")
+    
+    # Cuantización para CPU: Transforma matemática de 32bits a 8bits (Doble de rápido)
+    if device.type == 'cpu':
+        print("[Pysentimiento] Aplicando Cuantización de 8-bits (Turbo para CPU)...")
+        analyzer.model = torch.quantization.quantize_dynamic(
+            analyzer.model, {nn.Linear}, dtype=torch.qint8
+        )
+        
     resultados = []
     batch_size = 64
     total = len(texts)
@@ -50,6 +59,13 @@ def BertClasificator(texts: list) -> list:
     model.to(device)
     model.eval()
     
+    # Cuantización para CPU
+    if device.type == 'cpu':
+        print("[BERT] Aplicando Cuantización de 8-bits (Turbo para CPU)...")
+        model = torch.quantization.quantize_dynamic(
+            model, {nn.Linear}, dtype=torch.qint8
+        )
+    
     resultados = []
     batch_size = 64
     total = len(texts)
@@ -60,7 +76,7 @@ def BertClasificator(texts: list) -> list:
         
         # Tokenización
         inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        # Mover datos a la GPU
+        # Mover datos a la GPU (si aplica)
         inputs = {k: v.to(device) for k, v in inputs.items()}
         
         # Inferencia

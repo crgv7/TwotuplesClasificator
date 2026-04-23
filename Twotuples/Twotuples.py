@@ -17,7 +17,6 @@ pip install asent
 '''
 """
 import pandas as pd
-import concurrent.futures
 import torch
 import multiprocessing
 
@@ -47,12 +46,12 @@ from .utils import (
 def difuso_clasificator(data:str, ColumnName:str, C=False):
   pd.set_option('future.no_silent_downcasting', True)
   
-  # --- OPTIMIZACIÓN DE CPU ---
-  # PyTorch usa todos los núcleos por defecto. Al usar 3 clasificadores, se satura.
+  # --- OPTIMIZACIÓN DE CPU EXTREMA ---
+  # Al ejecutar en modo secuencial, le damos TODO el procesador a PyTorch 
+  # para que acelere la inferencia de Pysentimiento y BERT sin interrupciones.
   cores = multiprocessing.cpu_count()
-  threads_per_process = max(1, cores // 3)
-  torch.set_num_threads(threads_per_process)
-  print(f"\n[SISTEMA] Optimizando CPU: PyTorch usará {threads_per_process} hilos por clasificador (Total cores: {cores}).")
+  torch.set_num_threads(cores)
+  print(f"\n[SISTEMA] Turbo CPU Activado: PyTorch usará el 100% de la CPU ({cores} núcleos).")
   
   print(f"[SISTEMA] Cargando datos desde {data}...")
   df = pd.read_excel(data, sheet_name='Sheet1')
@@ -68,16 +67,12 @@ def difuso_clasificator(data:str, ColumnName:str, C=False):
   print(f"[SISTEMA] Deduplicación: Se encontraron {total_unicos} textos únicos de {total_original}.")
   print(f"[SISTEMA] ¡Te ahorrarás procesar {ahorro} textos repetidos!\n")
 
-  print("[SISTEMA] Iniciando clasificación en paralelo...")
+  print("[SISTEMA] Iniciando clasificación SECUENCIAL (Para evitar saturación de CPU)...")
   
-  with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-      future_pysentiment = executor.submit(PysentimentClasificator, textos_unicos)
-      future_bert = executor.submit(BertClasificator, textos_unicos)
-      future_asent = executor.submit(AsentClasificator, textos_unicos, C)
-      
-      clasif_pysentimiento_unicos = future_pysentiment.result()
-      clasif_bert_unicos = future_bert.result()
-      clasif_asent_unicos = future_asent.result()
+  # Ejecución Secuencial: Mucho más rápida en CPU que paralela para redes neuronales
+  clasif_asent_unicos = AsentClasificator(textos_unicos, C)
+  clasif_bert_unicos = BertClasificator(textos_unicos)
+  clasif_pysentimiento_unicos = PysentimentClasificator(textos_unicos)
       
   print("\n[SISTEMA] Clasificación terminada. Mapeando resultados...")
 
