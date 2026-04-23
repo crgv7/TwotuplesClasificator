@@ -1,6 +1,6 @@
 import pandas as pd
 from pysentimiento import create_analyzer
-from transformers import pipeline
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import spacy
@@ -22,20 +22,33 @@ def PysentimentClasificator(data:str, ColumnName:str):
 def TraduccionText(data:str, ColumnName:str):
   en_text={}
   df = pd.read_excel(data, sheet_name='Sheet1')
-  #tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-  translator = pipeline("translation_es_to_en",
-                      model="Helsinki-NLP/opus-mt-es-en") #modelo
+  
+  # 1. Cargamos el modelo y el tokenizador manualmente (De Español a Inglés)
+  model_id = "Helsinki-NLP/opus-mt-es-en"
+  tokenizer = AutoTokenizer.from_pretrained(model_id)
+  model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+
   for index, row in df.iterrows():
     try:
-      if len(row[ColumnName])>390:
-        opinion=row[ColumnName][0:390]
-        traduccion=translator(opinion)
+      # Recortamos a 390 caracteres si es muy largo
+      if len(row[ColumnName]) > 390:
+        opinion = row[ColumnName][0:390]
       else:
-        traduccion=translator(row[ColumnName])
-      en_text[index]=traduccion[0]['translation_text']
+        opinion = row[ColumnName]
+        
+      # 2. Convertimos el texto a tensores
+      inputs = tokenizer(opinion, return_tensors="pt")
+      
+      # 3. Generamos la traducción
+      outputs = model.generate(**inputs)
+      
+      # 4. Convertimos los números de vuelta a texto
+      traduccion = tokenizer.decode(outputs[0], skip_special_tokens=True)
+      
+      en_text[index] = traduccion
       print(index)
-    except:
-      print("no se pudo ejecutar")
+    except Exception as e:
+      print(f"no se pudo ejecutar: {e}")
 
   frame=pd.DataFrame( {'EN_Opiniones': en_text})
   frame.to_excel('score_en.xlsx')
