@@ -21,8 +21,7 @@ import pandas as pd
 # Importando funciones refactorizadas
 from .classifiers import (
     PysentimentClasificator,
-    TraduccionText,
-    VaderClasificator,
+    BertClasificator,
     AsentClasificator
 )
 
@@ -44,21 +43,21 @@ from .utils import (
 )
 
 def difuso_clasificator(data:str, ColumnName:str, C=False):
+  pd.set_option('future.no_silent_downcasting', True)
   PysentimentClasificator(data, ColumnName)
-  VaderClasificator(data,ColumnName)
-  AsentClasificator(data,ColumnName, C)
+  BertClasificator(data, ColumnName)
+  AsentClasificator(data, ColumnName, C)
   var={}
 
   #Trabajar con excel y dataframe
   df = ExcelConcat()
-  df_select=df.loc[:, ['clasificacion_pysentimiento', 'Clasificacion_Vader','Clasificacion_Asentiment']] #seleccionar columnas
-  df2=df_select.replace(['POS','NEU','NEG'],[2,1,0]) #sustituir etiquetas por valores numericos
+  df_select=df.loc[:, ['clasificacion_pysentimiento', 'Clasificacion_Bert','Clasificacion_Asentiment']] #seleccionar columnas
+  
+  # Sustituir etiquetas por valores numéricos y llenar posibles nulos con 1 (Neutral)
+  df2 = df_select.replace(['POS','NEU','NEG'], [2,1,0]).fillna(1) 
 
   polarity=generate_fuzzy_set(5) # la polaridad tiene un agranularidad de 5 (muy negativo (0), negativo(1),neutral(2),positivo(3), muy positivo(4))
   model=generate_fuzzy_set(3) # los modelos clasifican con 3 etiquetas
-  #experts_votation=[2,2,2,2,2,2] # positivo, neutral, positivo
-  #experts_votation = df2.iloc[15]
-  #print(experts_votation[1])
 
   for i, row in df2.iterrows(): #recorrer cada fila del dataframe
     experts_votation = df2.iloc[i] #selcciona cada datos de la fila

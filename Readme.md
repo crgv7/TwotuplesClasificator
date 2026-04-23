@@ -10,9 +10,9 @@ A diferencia de otras librerías de procesamiento de lenguaje natural (NLP), **t
 Durante su desarrollo, la librería fue probada con 21,847 comentarios de hoteles extraídos de TripAdvisor, obteniendo resultados excelentes evaluados a través del análisis de diversas métricas.
 
 ## Características
-- Integración de múltiples modelos de estado del arte: **Pysentimiento**, **Vader** y **Asent**.
+- Integración de múltiples modelos de estado del arte: **Pysentimiento**, **Bert Multilingual** y **Asent**.
 - Sistema de decisión consensuada basado en **Lógica Difusa (Fuzzy Logic)**.
-- Soporte para textos en **Español**. Traduce automáticamente los textos al inglés para los modelos que lo requieren.
+- Soporte para textos nativos, utilizando modelos multilingües que evitan la necesidad de traducciones previas.
 - Exportación automática de resultados y métricas a archivos **Excel**.
 
 ## Instalación
@@ -20,11 +20,11 @@ Durante su desarrollo, la librería fue probada con 21,847 comentarios de hotele
 Puedes instalar la librería utilizando `pip`. Como la librería está alojada en TestPyPI, debes incluir el parámetro `--extra-index-url` para que las dependencias estándar se descarguen de PyPI correctamente.
 
 ```bash
-pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ Twotuples==1.1.1
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ Twotuples==1.3.8
 ```
 
 > [!TIP]
-> **Recomendación:** Es altamente aconsejable ejecutar e instalar esta librería en entornos como **Google Colab** o un entorno virtual local dedicado, ya que requiere descargar modelos pesados de Machine Learning y diccionarios como `transformers`, `spacy` y los léxicos de `nltk`.
+> **Recomendación:** Es altamente aconsejable ejecutar e instalar esta librería en entornos como **Google Colab** o un entorno virtual local dedicado, ya que requiere descargar modelos pesados de Machine Learning y diccionarios como `transformers` y `spacy`.
 
 ## Uso Rápido (Quickstart)
 
@@ -40,13 +40,12 @@ archivo_excel = "data.xlsx"
 nombre_columna = "Opinion"
 
 # 2. Ejecutamos el clasificador difuso
-# NOTA: C=True habilita la traducción de los textos al inglés para los modelos Vader y Asent.
-Twotuples.difuso_clasificator(data=archivo_excel, ColumnName=nombre_columna, C=True)
+Twotuples.difuso_clasificator(data=archivo_excel, ColumnName=nombre_columna)
 ```
 
 **Archivos generados tras la ejecución:**
 - `score_diffuse.xlsx`: **Archivo final recomendado.** Contiene el texto original y una nueva columna llamada `Clasicacion_Difusa` con las etiquetas finales (POS, NEG, NEU).
-- `score_pysentiment.xlsx`, `score_vader.xlsx`, `score_asent.xlsx`: Archivos con los resultados individuales por cada modelo.
+- `score_pysentiment.xlsx`, `score_bert.xlsx`, `score_asent.xlsx`: Archivos con los resultados individuales por cada modelo.
 - `score.xlsx`: Resumen unificado numérico.
 
 ### 2. Evaluación de Métricas
@@ -68,18 +67,18 @@ Twotuples.Metric(etiqueta='Etiqueta_Real', metric='ConfusionMatrix', sorter='dif
 Ejecuta la predicción sobre un dataset completo.
 - **`data`** *(str)*: Ruta al archivo `.xlsx` que contiene los datos. Debe tener una hoja llamada `Sheet1`.
 - **`ColumnName`** *(str)*: Nombre de la columna en el Excel que contiene el texto a analizar.
-- **`C`** *(bool, opcional)*: Si es `True`, traduce los textos al inglés (requerido para `Vader` y `Asent` si los textos originales están en español). Por defecto es `False`.
+- **`C`** *(bool, opcional)*: Parámetro heredado por compatibilidad; ya no es necesario activarlo porque los modelos son multilingües.
 
 ### `Twotuples.Metric(etiqueta, metric='ClassificationReport', sorter='difuse', ClassNumber=3)`
 Evalúa y visualiza el rendimiento de las predicciones.
 - **`etiqueta`** *(str)*: Nombre de la columna con las clasificaciones manuales/reales.
 - **`metric`** *(str, opcional)*: Tipo de visualización. Opciones: `'ClassificationReport'` (tabla de texto) o `'ConfusionMatrix'` (gráfico visual).
-- **`sorter`** *(str, opcional)*: Define qué modelo específico evaluar. Opciones: `'difuse'`, `'pysentiment'`, `'vader'`, `'asent'`. Por defecto es `'difuse'`.
+- **`sorter`** *(str, opcional)*: Define qué modelo específico evaluar. Opciones: `'difuse'`, `'pysentiment'`, `'bert'`, `'asent'`. Por defecto es `'difuse'`.
 - **`ClassNumber`** *(int, opcional)*: Cantidad de clases de salida. Valores válidos son `2` o `3`. Por defecto es `3`.
 
 ## Tecnologías Usadas
 * **[Pysentimiento](https://pypi.org/project/pysentimiento/)** (v0.7.2): Herramienta de NLP basada en Transformers para español e inglés.
+* **[Bert Multilingual Sentiment](https://huggingface.co/nlptown/bert-base-multilingual-uncased-sentiment)**: Modelo fine-tuned de BERT para clasificación de reseñas en múltiples idiomas.
 * **[Asent](https://pypi.org/project/asent/)** (v0.8.0): Análisis de sentimientos basado en reglas para Spacy.
-* **[NLTK Vader](https://www.nltk.org/howto/sentiment.html)** (v3.8.1): Herramienta heurística robusta para el análisis de sentimientos.
-* **Transformers**: Uso del modelo de traducción `Helsinki-NLP/opus-mt-es-en`.
+* **Transformers & PyTorch**: Framework principal para los modelos de deep learning subyacentes.
 * Otras dependencias: `spacy`, `scikit-learn`, `pandas`, `numpy`, `matplotlib`.

@@ -1,8 +1,7 @@
 import pandas as pd
 from pysentimiento import create_analyzer
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import spacy
 import asent
 
@@ -19,67 +18,43 @@ def PysentimentClasificator(data:str, ColumnName:str):
   frame=pd.DataFrame( {'clasificacion_pysentimiento': resultado})   #crear nuevo dataframe con una columna de clasificacion
   frame.to_excel('score_pysentiment.xlsx')
 
-def TraduccionText(data:str, ColumnName:str):
-  en_text={}
+def BertClasificator(data:str, ColumnName:str):
   df = pd.read_excel(data, sheet_name='Sheet1')
+  bert_clasif={}
   
-  # 1. Cargamos el modelo y el tokenizador manualmente (De Español a Inglés)
-  model_id = "Helsinki-NLP/opus-mt-es-en"
+  # Cargamos el modelo y el tokenizer
+  model_id = "nlptown/bert-base-multilingual-uncased-sentiment"
   tokenizer = AutoTokenizer.from_pretrained(model_id)
-  model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-
+  model = AutoModelForSequenceClassification.from_pretrained(model_id)
+  
   for index, row in df.iterrows():
-    try:
-      # Recortamos a 390 caracteres si es muy largo
-      if len(row[ColumnName]) > 390:
-        opinion = row[ColumnName][0:390]
-      else:
-        opinion = row[ColumnName]
-        
-      # 2. Convertimos el texto a tensores
-      inputs = tokenizer(opinion, return_tensors="pt")
+    opinion = str(row[ColumnName])
+    
+    # Tokenización
+    inputs = tokenizer(opinion, return_tensors="pt", padding=True, truncation=True)
+    
+    # Inferencia
+    with torch.no_grad():
+      outputs = model(**inputs)
       
-      # 3. Generamos la traducción
-      outputs = model.generate(**inputs)
-      
-      # 4. Convertimos los números de vuelta a texto
-      traduccion = tokenizer.decode(outputs[0], skip_special_tokens=True)
-      
-      en_text[index] = traduccion
-      print(index)
-    except Exception as e:
-      print(f"no se pudo ejecutar: {e}")
+    # Procesar resultados
+    prediction = torch.argmax(outputs.logits, dim=-1).item()
+    estrellas = prediction + 1
+    
+    print(f"{index} --- Estrellas: {estrellas}")
+    if estrellas in [1, 2]:
+      bert_clasif[index] = 'NEG'
+    elif estrellas == 3:
+      bert_clasif[index] = 'NEU'
+    elif estrellas in [4, 5]:
+      bert_clasif[index] = 'POS'
 
-  frame=pd.DataFrame( {'EN_Opiniones': en_text})
-  frame.to_excel('score_en.xlsx')
-  return frame
-
-def VaderClasificator(data:str, ColumnName:str):
-  df=TraduccionText(data,ColumnName)
-  nltk.download('vader_lexicon')
-  vader_clasif={}
-  #Creamos el analizador de sentimientos
-  vader = SentimentIntensityAnalyzer()
-  #Analizamos cada frase
-  for index,row in df.iterrows():
-    sentiment = vader.polarity_scores(row['EN_Opiniones'])
-    print(index, '---',sentiment)
-    if sentiment['compound']>0.3:
-      vader_clasif[index]='POS'
-    elif sentiment['compound']<0.3 and sentiment['compound']>0:
-      vader_clasif[index]='NEU'
-    else:
-      vader_clasif[index]='NEG'
-
-  frame=pd.DataFrame( {'Clasificacion_Vader': vader_clasif})
-  #final=pd.concat([df,fr_vader], axis=1)
-  frame.to_excel('score_vader.xlsx')
+  frame=pd.DataFrame( {'Clasificacion_Bert': bert_clasif})
+  frame.to_excel('score_bert.xlsx')
 
 def AsentClasificator(data:str, ColumnName:str, C=True):
-  if C:
-    df=TraduccionText(data,ColumnName)
-  else:
-      df = pd.read_excel('score_en.xlsx', sheet_name='Sheet1')
+  # Como se quitó la traducción, leemos directamente el archivo original
+  df = pd.read_excel(data, sheet_name='Sheet1')
 
   asentimiento_clasif={}
   # load spacy pipeline
@@ -91,8 +66,9 @@ def AsentClasificator(data:str, ColumnName:str, C=True):
 
 
   for index, row in df.iterrows():
-      sentiment=nlp(row['EN_Opiniones'])#clasifica el texto
-      asentimiento_clasif[index]=sentiment._.polarity   #me quede aqui
+      opinion = str(row[ColumnName])
+      sentiment=nlp(opinion)#clasifica el texto
+      asentimiento_clasif[index]=sentiment._.polarity
       print(asentimiento_clasif[index])
       print(index)
       if asentimiento_clasif[index].compound >0.2:
@@ -103,5 +79,4 @@ def AsentClasificator(data:str, ColumnName:str, C=True):
         asentimiento_clasif[index]='NEG'
 
   frame=pd.DataFrame( {'Clasificacion_Asentiment': asentimiento_clasif})   #crear nuevo dataframe con una columna de clasificacion
-  #final=pd.concat([df,fr_asent], axis=1)
   frame.to_excel('score_asent.xlsx')

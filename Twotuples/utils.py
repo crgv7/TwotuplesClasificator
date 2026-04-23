@@ -23,7 +23,7 @@ def score(df:pd):
   score=df
   score['Clasificacion_Difusa']=score['Clasicacion_Difusa'].replace([4,3,2,1,0],['POS','POS','NEU','NEG','NEG'])
   score['clasificacion_pysentimiento']=score['clasificacion_pysentimiento'].replace([2,1,0],['POS','NEU','NEG'])
-  score['Clasificacion_Vader']=score['Clasificacion_Vader'].replace([2,1,0],['POS','NEU','NEG'])
+  score['Clasificacion_Bert']=score['Clasificacion_Bert'].replace([2,1,0],['POS','NEU','NEG'])
   score['Clasificacion_Asentiment']=score['Clasificacion_Asentiment'].replace([2,1,0],['POS','NEU','NEG'])
   score.to_excel('score.xlsx')
 
@@ -39,8 +39,8 @@ def Metric(etiqueta:str, metric:str='ClassificationReport', sorter:str='difuse',
     actual = df[etiqueta]
     if sorter=='pysentiment' :
         predicted = df['clasificacion_pysentimiento']
-    elif sorter=='vader':
-      predicted = df['Clasificacion_Vader']
+    elif sorter=='bert':
+      predicted = df['Clasificacion_Bert']
     elif  sorter=='asent':
       predicted = df['Clasificacion_Asentiment']
     else:
@@ -60,8 +60,8 @@ def Metric(etiqueta:str, metric:str='ClassificationReport', sorter:str='difuse',
     actual = df[etiqueta]
     if sorter=='pysentiment' :
         predicted = df['clasificacion_pysentimiento']
-    elif sorter=='vader':
-      predicted = df['Clasificacion_Vader']
+    elif sorter=='bert':
+      predicted = df['Clasificacion_Bert']
     elif  sorter=='asent':
       predicted = df['Clasificacion_Asentiment']
     else:
