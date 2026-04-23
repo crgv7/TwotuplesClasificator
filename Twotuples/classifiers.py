@@ -23,7 +23,7 @@ def TraduccionText(data:str, ColumnName:str):
   en_text={}
   df = pd.read_excel(data, sheet_name='Sheet1')
   #tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-  translator = pipeline("translation",
+  translator = pipeline("translation_es_to_en",
                       model="Helsinki-NLP/opus-mt-es-en") #modelo
   for index, row in df.iterrows():
     try:
