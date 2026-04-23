@@ -17,6 +17,7 @@ pip install asent
 '''
 """
 import pandas as pd
+import concurrent.futures
 
 # Importando funciones refactorizadas
 from .classifiers import (
@@ -37,39 +38,72 @@ from .fuzzy_logic import (
 )
 
 from .utils import (
-    ExcelConcat,
     score,
     Metric
 )
+# Nota: ExcelConcat ha sido removido porque ya no trabajamos guardando archivos intermedios.
 
 def difuso_clasificator(data:str, ColumnName:str, C=False):
   pd.set_option('future.no_silent_downcasting', True)
-  PysentimentClasificator(data, ColumnName)
-  BertClasificator(data, ColumnName)
-  AsentClasificator(data, ColumnName, C)
-  var={}
-
-  #Trabajar con excel y dataframe
-  df = ExcelConcat()
-  df_select=df.loc[:, ['clasificacion_pysentimiento', 'Clasificacion_Bert','Clasificacion_Asentiment']] #seleccionar columnas
   
-  # Sustituir etiquetas por valores numéricos y llenar posibles nulos con 1 (Neutral)
-  df2 = df_select.replace(['POS','NEU','NEG'], [2,1,0]).fillna(1) 
+  print(f"Cargando datos desde {data}...")
+  df = pd.read_excel(data, sheet_name='Sheet1')
+  
+  # Extraer la columna de textos como una lista de strings
+  textos = df[ColumnName].astype(str).tolist()
+
+  print("Iniciando clasificación en paralelo (usando GPU si está disponible)...")
+  
+  # Usamos ThreadPoolExecutor para paralelizar. 
+  # En Python, para operaciones intensivas con PyTorch, ThreadPoolExecutor es seguro y libera el GIL.
+  with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+      # Lanzamos las 3 tareas al mismo tiempo
+      future_pysentiment = executor.submit(PysentimentClasificator, textos)
+      future_bert = executor.submit(BertClasificator, textos)
+      future_asent = executor.submit(AsentClasificator, textos, C)
+      
+      # Esperamos a que terminen y obtenemos los resultados
+      clasif_pysentimiento = future_pysentiment.result()
+      clasif_bert = future_bert.result()
+      clasif_asent = future_asent.result()
+      
+  print("Clasificación terminada. Integrando resultados...")
+
+  # Crear DataFrame con los resultados
+  df_select = pd.DataFrame({
+      'clasificacion_pysentimiento': clasif_pysentimiento,
+      'Clasificacion_Bert': clasif_bert,
+      'Clasificacion_Asentiment': clasif_asent
+  })
+  
+  # Sustituir etiquetas por valores numéricos, forzar tipo numérico y llenar posibles nulos con 1 (Neutral)
+  df2 = df_select.replace(['POS','NEU','NEG'], [2,1,0])
+  df2 = df2.apply(pd.to_numeric, errors='coerce').fillna(1).astype(int)
 
   polarity=generate_fuzzy_set(5) # la polaridad tiene un agranularidad de 5 (muy negativo (0), negativo(1),neutral(2),positivo(3), muy positivo(4))
   model=generate_fuzzy_set(3) # los modelos clasifican con 3 etiquetas
 
+  var=[]
+  
+  print("Aplicando lógica difusa...")
   for i, row in df2.iterrows(): #recorrer cada fila del dataframe
-    experts_votation = df2.iloc[i] #selcciona cada datos de la fila
+    experts_votation = row.values #selecciona cada dato de la fila
     fuzzy_sets_2_tuple=[]
     for index in experts_votation: #selecciona la votacion de los expertos
       fuzzy_set=transform_to_fuzzy_set(model[index],polarity)
       fuzzy_sets_2_tuple.append(fuzzy_set_2_tuple(fuzzy_set))
-    print(media_aritmetica(fuzzy_sets_2_tuple))
-    var[i]=media_aritmetica(fuzzy_sets_2_tuple)[0] #guarda cada resultado
+    
+    # Calcular y guardar la media aritmética
+    res = media_aritmetica(fuzzy_sets_2_tuple)
+    var.append(res[0]) 
 
-  df=pd.read_excel(data,sheet_name='Sheet1')
-  difuso=pd.DataFrame( {'Clasicacion_Difusa': var})
-  final=pd.concat([df,df2,difuso], axis=1)
+  print("Guardando resultados finales...")
+  difuso = pd.DataFrame({'Clasicacion_Difusa': var})
+  
+  # Concatenar el dataframe original, las predicciones numéricas (df2) y el resultado difuso
+  final = pd.concat([df, df2, difuso], axis=1)
   final.to_excel('score_diffuse.xlsx')
+  
+  print("Calculando métricas (score)...")
   score(final)
+  print("¡Proceso completado exitosamente!")

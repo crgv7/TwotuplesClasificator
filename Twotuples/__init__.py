@@ -1,2 +1,2 @@
-from .Twotuples import PysentimentClasificator,TraduccionText,VaderClasificator,AsentClasificator,difuso_clasificator,Metric
+from .Twotuples import PysentimentClasificator, BertClasificator, AsentClasificator, difuso_clasificator, Metric
 

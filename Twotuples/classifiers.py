@@ -5,78 +5,92 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import spacy
 import asent
 
-def PysentimentClasificator(data:str, ColumnName:str):
-  df = pd.read_excel(data, sheet_name='Sheet1')
-  resultado={}
-  analyzer = create_analyzer(task="sentiment", lang="es")
-  for index, row in df.iterrows():
-    out=analyzer.predict(row[ColumnName])#clasifica el texto
-    resultado[index]=out.output
-    print(index)
+# Detectar si hay GPU disponible
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Dispositivo de procesamiento detectado: {device}")
 
-
-  frame=pd.DataFrame( {'clasificacion_pysentimiento': resultado})   #crear nuevo dataframe con una columna de clasificacion
-  frame.to_excel('score_pysentiment.xlsx')
-
-def BertClasificator(data:str, ColumnName:str):
-  df = pd.read_excel(data, sheet_name='Sheet1')
-  bert_clasif={}
-  
-  # Cargamos el modelo y el tokenizer
-  model_id = "nlptown/bert-base-multilingual-uncased-sentiment"
-  tokenizer = AutoTokenizer.from_pretrained(model_id)
-  model = AutoModelForSequenceClassification.from_pretrained(model_id)
-  
-  for index, row in df.iterrows():
-    opinion = str(row[ColumnName])
+def PysentimentClasificator(texts: list) -> list:
+    print("Iniciando Pysentimiento...")
+    analyzer = create_analyzer(task="sentiment", lang="es")
+    resultados = []
+    batch_size = 64
     
-    # Tokenización
-    inputs = tokenizer(opinion, return_tensors="pt", padding=True, truncation=True)
+    # Procesamiento por lotes
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        try:
+            # Pysentimiento en versiones recientes acepta listas
+            outs = analyzer.predict(batch)
+            if isinstance(outs, list):
+                resultados.extend([out.output for out in outs])
+            else:
+                resultados.append(outs.output)
+        except Exception:
+            # Fallback si falla el lote
+            for text in batch:
+                out = analyzer.predict(text)
+                resultados.append(out.output)
     
-    # Inferencia
-    with torch.no_grad():
-      outputs = model(**inputs)
-      
-    # Procesar resultados
-    prediction = torch.argmax(outputs.logits, dim=-1).item()
-    estrellas = prediction + 1
+    print("Pysentimiento finalizado.")
+    return resultados
+
+def BertClasificator(texts: list) -> list:
+    print("Iniciando BERT Multilingual...")
+    model_id = "nlptown/bert-base-multilingual-uncased-sentiment"
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForSequenceClassification.from_pretrained(model_id)
     
-    print(f"{index} --- Estrellas: {estrellas}")
-    if estrellas in [1, 2]:
-      bert_clasif[index] = 'NEG'
-    elif estrellas == 3:
-      bert_clasif[index] = 'NEU'
-    elif estrellas in [4, 5]:
-      bert_clasif[index] = 'POS'
+    # Mover modelo a la GPU si está disponible
+    model.to(device)
+    model.eval()
+    
+    resultados = []
+    batch_size = 64
+    
+    # Procesamiento por lotes
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        
+        # Tokenización
+        inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=512)
+        # Mover datos a la GPU
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        
+        # Inferencia
+        with torch.no_grad():
+            outputs = model(**inputs)
+            
+        predictions = torch.argmax(outputs.logits, dim=-1)
+        estrellas = predictions + 1
+        
+        for est in estrellas:
+            e = est.item()
+            if e in [1, 2]:
+                resultados.append('NEG')
+            elif e == 3:
+                resultados.append('NEU')
+            else:
+                resultados.append('POS')
+                
+    print("BERT finalizado.")
+    return resultados
 
-  frame=pd.DataFrame( {'Clasificacion_Bert': bert_clasif})
-  frame.to_excel('score_bert.xlsx')
-
-def AsentClasificator(data:str, ColumnName:str, C=True):
-  # Como se quitó la traducción, leemos directamente el archivo original
-  df = pd.read_excel(data, sheet_name='Sheet1')
-
-  asentimiento_clasif={}
-  # load spacy pipeline
-  nlp = spacy.blank('en')
-  nlp.add_pipe('sentencizer')
-
-  # add the rule-based sentiment model
-  nlp.add_pipe('asent_en_v1')
-
-
-  for index, row in df.iterrows():
-      opinion = str(row[ColumnName])
-      sentiment=nlp(opinion)#clasifica el texto
-      asentimiento_clasif[index]=sentiment._.polarity
-      print(asentimiento_clasif[index])
-      print(index)
-      if asentimiento_clasif[index].compound >0.2:
-        asentimiento_clasif[index]='POS'
-      elif asentimiento_clasif[index].compound<0.2 and asentimiento_clasif[index].compound>0 :
-        asentimiento_clasif[index]='NEU'
-      else:
-        asentimiento_clasif[index]='NEG'
-
-  frame=pd.DataFrame( {'Clasificacion_Asentiment': asentimiento_clasif})   #crear nuevo dataframe con una columna de clasificacion
-  frame.to_excel('score_asent.xlsx')
+def AsentClasificator(texts: list, C=True) -> list:
+    print("Iniciando Asentimiento (SpaCy)...")
+    nlp = spacy.blank('en')
+    nlp.add_pipe('sentencizer')
+    nlp.add_pipe('asent_en_v1')
+    
+    resultados = []
+    # spaCy usa nlp.pipe para procesar textos rápidamente en lotes
+    for doc in nlp.pipe(texts, batch_size=128):
+        compound = doc._.polarity.compound
+        if compound > 0.2:
+            resultados.append('POS')
+        elif compound < 0.2 and compound > 0:
+            resultados.append('NEU')
+        else:
+            resultados.append('NEG')
+            
+    print("Asentimiento finalizado.")
+    return resultados

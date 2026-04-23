@@ -1,4 +1,3 @@
-nltk
 transformers[sentencepiece]
 transformers
 spacy
