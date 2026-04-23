@@ -10,13 +10,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Dispositivo de procesamiento detectado: {device}")
 
 def PysentimentClasificator(texts: list) -> list:
-    print("Iniciando Pysentimiento...")
+    print("[Pysentimiento] Iniciando carga de modelo...")
     analyzer = create_analyzer(task="sentiment", lang="es")
     resultados = []
     batch_size = 64
+    total = len(texts)
     
     # Procesamiento por lotes
-    for i in range(0, len(texts), batch_size):
+    for i in range(0, total, batch_size):
         batch = texts[i:i+batch_size]
         try:
             # Pysentimiento en versiones recientes acepta listas
@@ -30,12 +31,17 @@ def PysentimentClasificator(texts: list) -> list:
             for text in batch:
                 out = analyzer.predict(text)
                 resultados.append(out.output)
+                
+        # Log de progreso
+        procesados = min(i + batch_size, total)
+        if procesados % (batch_size * 5) == 0 or procesados == total:
+            print(f"[Pysentimiento] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
     
-    print("Pysentimiento finalizado.")
+    print("[Pysentimiento] ¡Finalizado!")
     return resultados
 
 def BertClasificator(texts: list) -> list:
-    print("Iniciando BERT Multilingual...")
+    print("[BERT] Iniciando carga de modelo Multilingual...")
     model_id = "nlptown/bert-base-multilingual-uncased-sentiment"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = AutoModelForSequenceClassification.from_pretrained(model_id)
@@ -46,9 +52,10 @@ def BertClasificator(texts: list) -> list:
     
     resultados = []
     batch_size = 64
+    total = len(texts)
     
     # Procesamiento por lotes
-    for i in range(0, len(texts), batch_size):
+    for i in range(0, total, batch_size):
         batch = texts[i:i+batch_size]
         
         # Tokenización
@@ -72,16 +79,24 @@ def BertClasificator(texts: list) -> list:
             else:
                 resultados.append('POS')
                 
-    print("BERT finalizado.")
+        # Log de progreso
+        procesados = min(i + batch_size, total)
+        if procesados % (batch_size * 5) == 0 or procesados == total:
+            print(f"[BERT] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
+                
+    print("[BERT] ¡Finalizado!")
     return resultados
 
 def AsentClasificator(texts: list, C=True) -> list:
-    print("Iniciando Asentimiento (SpaCy)...")
+    print("[Asentimiento] Iniciando carga de SpaCy...")
     nlp = spacy.blank('en')
     nlp.add_pipe('sentencizer')
     nlp.add_pipe('asent_en_v1')
     
     resultados = []
+    total = len(texts)
+    procesados = 0
+    
     # spaCy usa nlp.pipe para procesar textos rápidamente en lotes
     for doc in nlp.pipe(texts, batch_size=128):
         compound = doc._.polarity.compound
@@ -92,5 +107,10 @@ def AsentClasificator(texts: list, C=True) -> list:
         else:
             resultados.append('NEG')
             
-    print("Asentimiento finalizado.")
+        procesados += 1
+        # Log de progreso
+        if procesados % 500 == 0 or procesados == total:
+            print(f"[Asentimiento] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
+            
+    print("[Asentimiento] ¡Finalizado!")
     return resultados
