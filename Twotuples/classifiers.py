@@ -120,9 +120,9 @@ def AsentClasificator(texts: list, C=True) -> list:
     # spaCy usa nlp.pipe para procesar textos rápidamente en lotes
     for doc in nlp.pipe(texts, batch_size=128):
         compound = doc._.polarity.compound
-        if compound > 0.2:
+        if compound > 0.15:
             resultados.append('POS')
-        elif compound < 0.2 and compound > 0:
+        elif compound < 0.15 and compound > 0:
             resultados.append('NEU')
         else:
             resultados.append('NEG')
