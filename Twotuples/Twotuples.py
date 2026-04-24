@@ -14,6 +14,7 @@ pip install nltk
 pip install transformers[sentencepiece]
 pip install spacy
 pip install asent
+pip install optimum[onnxruntime]
 '''
 """
 import pandas as pd
@@ -43,7 +44,7 @@ from .utils import (
     Metric
 )
 
-def difuso_clasificator(data:str, ColumnName:str, C=False):
+def difuso_clasificator(data:str, ColumnName:str, C=False, limite:int=None):
   pd.set_option('future.no_silent_downcasting', True)
   
   # --- OPTIMIZACIÓN DE CPU EXTREMA ---
@@ -55,6 +56,11 @@ def difuso_clasificator(data:str, ColumnName:str, C=False):
   
   print(f"[SISTEMA] Cargando datos desde {data}...")
   df = pd.read_excel(data, sheet_name='Sheet1')
+  
+  # Aplicar límite si el usuario lo solicita
+  if limite is not None:
+      print(f"[SISTEMA] Limitando el proceso a las primeras {limite} filas...")
+      df = df.head(limite).copy()
   
   # Extraer la columna de textos
   textos_completos = df[ColumnName].astype(str).tolist()

@@ -50,57 +50,61 @@ def PysentimentClasificator(texts: list) -> list:
     return resultados
 
 def BertClasificator(texts: list) -> list:
-    print("[BERT] Iniciando carga de modelo Multilingual...")
-    model_id = "nlptown/bert-base-multilingual-uncased-sentiment"
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModelForSequenceClassification.from_pretrained(model_id)
+    print("[BERT] Iniciando carga de modelo ONNX (carlosrgv/bert-sentimiento-hoteles-onnx)...")
+    from optimum.onnxruntime import ORTModelForSequenceClassification
+    from transformers import AutoTokenizer, pipeline
     
-    # Mover modelo a la GPU si está disponible
-    model.to(device)
-    model.eval()
+    repo_id = "carlosrgv/bert-sentimiento-hoteles-onnx"
     
-    # Cuantización para CPU
-    if device.type == 'cpu':
-        print("[BERT] Aplicando Cuantización de 8-bits (Turbo para CPU)...")
-        model = torch.quantization.quantize_dynamic(
-            model, {nn.Linear}, dtype=torch.qint8
-        )
+    # Cargar ONNX directamente desde Hugging Face
+    model = ORTModelForSequenceClassification.from_pretrained(repo_id, file_name="model_quantized.onnx")
+    tokenizer = AutoTokenizer.from_pretrained(repo_id)
+    classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
     
     resultados = []
-    batch_size = 64
+    batch_size = 128 # La pipeline procesa muy rápido en CPU
     total = len(texts)
     
-    # Procesamiento por lotes
+    # Procesamiento por lotes para mantener el progreso
     for i in range(0, total, batch_size):
         batch = texts[i:i+batch_size]
+        # Truncar los textos a 512 para evitar errores de longitud en el tokenizador
+        batch_trunc = [str(t)[:512] for t in batch]
         
-        # Tokenización
-        inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        # Mover datos a la GPU (si aplica)
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-        
-        # Inferencia
-        with torch.no_grad():
-            outputs = model(**inputs)
+        try:
+            # Inferir el lote
+            outs = classifier(batch_trunc)
             
-        predictions = torch.argmax(outputs.logits, dim=-1)
-        estrellas = predictions + 1
-        
-        for est in estrellas:
-            e = est.item()
-            if e in [1, 2]:
-                resultados.append('NEG')
-            elif e == 3:
-                resultados.append('NEU')
-            else:
-                resultados.append('POS')
+            for out in outs:
+                label = str(out['label']).upper()
+                # Mapeo universal por si devuelve estrellas o POS/NEG directamente
+                if "1" in label or "2" in label or "NEG" in label:
+                    resultados.append('NEG')
+                elif "3" in label or "NEU" in label:
+                    resultados.append('NEU')
+                else:
+                    resultados.append('POS')
+        except Exception as e:
+            # Fallback a uno por uno si falla un lote
+            for t in batch_trunc:
+                try:
+                    out = classifier(t)[0]
+                    label = str(out['label']).upper()
+                    if "1" in label or "2" in label or "NEG" in label:
+                        resultados.append('NEG')
+                    elif "3" in label or "NEU" in label:
+                        resultados.append('NEU')
+                    else:
+                        resultados.append('POS')
+                except Exception:
+                    resultados.append('NEU')
                 
         # Log de progreso
         procesados = min(i + batch_size, total)
-        if procesados % (batch_size * 5) == 0 or procesados == total:
-            print(f"[BERT] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
+        if procesados % (batch_size * 4) == 0 or procesados == total:
+            print(f"[BERT-ONNX] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
                 
-    print("[BERT] ¡Finalizado!")
+    print("[BERT-ONNX] ¡Finalizado!")
     return resultados
 
 def AsentClasificator(texts: list, C=True) -> list:
