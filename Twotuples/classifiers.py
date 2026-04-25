@@ -131,33 +131,71 @@ def analizar_sentimiento_avanzado(texto, diccionario):
     
     multiplicador_contraste = 1.0
 
-    for t in tokens:
+    i = 0
+    while i < len(tokens):
+        # Intentar con bigramas primero
+        if i < len(tokens) - 1:
+            bigrama = f"{tokens[i]} {tokens[i+1]}"
+            if bigrama in diccionario:
+                valor = diccionario[bigrama]
+                
+                # Aplicar negación
+                if negacion_activa and ventana_negacion > 0:
+                    valor *= -1.0
+                    ventana_negacion -= 1
+                    
+                # Aplicar intensificadores/atenuadores
+                if ventana_intensidad > 0:
+                    valor *= multiplicador_intensidad
+                    ventana_intensidad -= 1
+                    
+                # Aplicar contraste
+                valor *= multiplicador_contraste
+                
+                score_total += valor
+                
+                # Limpiar ventanas si se acaban
+                if ventana_negacion <= 0:
+                    negacion_activa = False
+                if ventana_intensidad <= 0:
+                    multiplicador_intensidad = 1.0
+                    
+                i += 2
+                continue
+
+        t = tokens[i]
+
         if t in CONTRASTES:
             # Lógica del "PERO": Reducir a la mitad el sentimiento anterior
             score_total *= 0.5
             # Y darle un 50% más de peso a todo lo que viene después (hasta el punto)
             multiplicador_contraste = 1.5
+            i += 1
             continue
 
         if t in PUNTUACION_CORTE:
             negacion_activa = False
             ventana_negacion = 0
             multiplicador_contraste = 1.0 # El contraste se reinicia con la puntuación
+            i += 1
             continue
 
         if t in NEGACIONES:
             negacion_activa = True
             ventana_negacion = 3 
+            i += 1
             continue
             
         if t in INTENSIFICADORES:
             multiplicador_intensidad = 1.5
             ventana_intensidad = 2
+            i += 1
             continue
             
         if t in ATENUADORES:
             multiplicador_intensidad = 0.5
             ventana_intensidad = 2
+            i += 1
             continue
 
         if t in diccionario:
@@ -179,10 +217,12 @@ def analizar_sentimiento_avanzado(texto, diccionario):
             score_total += valor
         
         # Limpiar ventanas si se acaban
-        if ventana_negacion == 0:
+        if ventana_negacion <= 0:
             negacion_activa = False
-        if ventana_intensidad == 0:
+        if ventana_intensidad <= 0:
             multiplicador_intensidad = 1.0
+            
+        i += 1
             
     return score_total
 
