@@ -18,7 +18,7 @@ pip install optimum[onnxruntime]
 '''
 """
 import pandas as pd
-
+import numpy as np
 
 # Importando funciones refactorizadas
 from .classifiers import (
@@ -35,7 +35,8 @@ from .fuzzy_logic import (
     generate_fuzzy_set,
     transform_to_fuzzy_set,
     fuzzy_set_2_tuple,
-    media_aritmetica
+    media_aritmetica,
+    media_ponderada
 )
 
 from .utils import (
@@ -114,15 +115,42 @@ def difuso_clasificator(data:str, ColumnName:str, C=False, limite:int=None):
 
   var=[]
   
-  print("[SISTEMA] Aplicando lógica difusa...")
-  for i, row in df2.iterrows():
-    experts_votation = row.values
-    fuzzy_sets_2_tuple=[]
-    for index in experts_votation:
-      fuzzy_set=transform_to_fuzzy_set(model[index],polarity)
-      fuzzy_sets_2_tuple.append(fuzzy_set_2_tuple(fuzzy_set))
+  print("[SISTEMA] Aplicando lógica difusa sobre valores continuos...")
+  
+  def score_to_2tuple(score, max_val):
+      # Limitar el score para evitar que valores extremos rompan la escala
+      clipped = max(-max_val, min(max_val, score))
+      # Normalizar de [-max_val, max_val] a [0, 1]
+      norm = (clipped + max_val) / (2 * max_val)
+      # Mapear al espacio de 5 términos lingüísticos de la polaridad [0, 4]
+      beta = norm * 4.0
+      index = int(np.round(beta))
+      alpha = beta - index
+      return (index, alpha)
+
+  for i, row in df_scores.iterrows():
+    # Extraer los decimales reales
+    val_lexicon = row['Score_Lexicon_JSON']
+    val_sentiment = row['Score_Sentiment_Spanish']
+    val_senticon = row['Score_Senticon_XML']
     
-    res = media_aritmetica(fuzzy_sets_2_tuple)
+    # Convertir cada decimal a un voto difuso (2-tuple)
+    # Los diccionarios (Lexicon/Senticon) pueden sumar puntos altos, limitamos a 2.5
+    # SentimentSpanish ya está estrictamente entre -1.0 y 1.0
+    fuzzy_sets_2_tuple = [
+        score_to_2tuple(val_lexicon, max_val=2.5),
+        score_to_2tuple(val_sentiment, max_val=1.0),
+        score_to_2tuple(val_senticon, max_val=2.5)
+    ]
+    
+    # Pesos basados en el rendimiento de cada modelo (Estrategia 4):
+    # - Lexicon_JSON: 35% (Buena precisión, filtra falsos positivos)
+    # - Sentiment_Spanish: 50% (Excelente Recall para detectar negativos)
+    # - Senticon_XML: 15% (El más débil, se le da menos peso)
+    weights = [0.35, 0.50, 0.15]
+    
+    # Calcular la media difusa ponderada de los 3 clasificadores
+    res = media_ponderada(fuzzy_sets_2_tuple, weights)
     var.append(res[0]) 
 
   print(f"[SISTEMA] Guardando resultados finales en 'score_diffuse.xlsx'...")

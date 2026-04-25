@@ -7,6 +7,9 @@ from tqdm import tqdm
 
 NEGACIONES = {'no', 'nada', 'nunca', 'jamás', 'ni', 'tampoco', 'sin'}
 PUNTUACION_CORTE = {'.', ',', ';', '!', '?'}
+INTENSIFICADORES = {'muy', 'demasiado', 'super', 'súper', 'extremadamente', 'bastante', 'altamente', 'totalmente', 'realmente'}
+ATENUADORES = {'poco', 'algo', 'ligeramente', 'apenas', 'medio'}
+CONTRASTES = {'pero', 'aunque'}
 def cargar_lexico_json(path):
     print(f"[Lexicon JSON] Cargando léxico JSON: {path}...")
     try:
@@ -122,29 +125,64 @@ def analizar_sentimiento_avanzado(texto, diccionario):
     score_total = 0.0
     negacion_activa = False
     ventana_negacion = 0 
+    
+    multiplicador_intensidad = 1.0
+    ventana_intensidad = 0
+    
+    multiplicador_contraste = 1.0
 
     for t in tokens:
+        if t in CONTRASTES:
+            # Lógica del "PERO": Reducir a la mitad el sentimiento anterior
+            score_total *= 0.5
+            # Y darle un 50% más de peso a todo lo que viene después (hasta el punto)
+            multiplicador_contraste = 1.5
+            continue
+
         if t in PUNTUACION_CORTE:
             negacion_activa = False
             ventana_negacion = 0
+            multiplicador_contraste = 1.0 # El contraste se reinicia con la puntuación
             continue
 
         if t in NEGACIONES:
             negacion_activa = True
             ventana_negacion = 3 
             continue
+            
+        if t in INTENSIFICADORES:
+            multiplicador_intensidad = 1.5
+            ventana_intensidad = 2
+            continue
+            
+        if t in ATENUADORES:
+            multiplicador_intensidad = 0.5
+            ventana_intensidad = 2
+            continue
 
         if t in diccionario:
             valor = diccionario[t]
             
+            # Aplicar negación
             if negacion_activa and ventana_negacion > 0:
-                score_total += (valor * -1.0)
+                valor *= -1.0
                 ventana_negacion -= 1
-            else:
-                score_total += valor
+                
+            # Aplicar intensificadores/atenuadores
+            if ventana_intensidad > 0:
+                valor *= multiplicador_intensidad
+                ventana_intensidad -= 1
+                
+            # Aplicar contraste
+            valor *= multiplicador_contraste
+            
+            score_total += valor
         
+        # Limpiar ventanas si se acaban
         if ventana_negacion == 0:
             negacion_activa = False
+        if ventana_intensidad == 0:
+            multiplicador_intensidad = 1.0
             
     return score_total
 

@@ -85,3 +85,11 @@ def media_aritmetica(tuple_list):
     index=np.round(beta)
     alpha=beta-index
     return (index,alpha)
+
+def media_ponderada(tuple_list, weights):
+    vals = np.asarray([tup[0]+tup[1] for tup in tuple_list])
+    w = np.asarray(weights)
+    beta = np.sum(vals * w) / np.sum(w)
+    index = np.round(beta)
+    alpha = beta - index
+    return (index, alpha)

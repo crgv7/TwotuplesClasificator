@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 HERE = pathlib.Path(__file__).parent
 
-VERSION = '1.7.9' #Muy importante, deberéis ir cambiando la versión de vuestra librería según incluyáis nuevas funcionalidades
+VERSION = '1.8.3' #Muy importante, deberéis ir cambiando la versión de vuestra librería según incluyáis nuevas funcionalidades
 PACKAGE_NAME = 'Twotuples' #Debe coincidir con el nombre de la carpeta 
 AUTHOR = 'Carlos Garcia Vargas y Orlando Toledano' #Modificar con vuestros datos
 AUTHOR_EMAIL = '' #Modificar con vuestros datos
