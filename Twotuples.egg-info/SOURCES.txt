@@ -5,6 +5,8 @@ Twotuples/Twotuples.py
 Twotuples/__init__.py
 Twotuples/classifiers.py
 Twotuples/fuzzy_logic.py
+Twotuples/lexicon.json
+Twotuples/senticon.es.xml
 Twotuples/utils.py
 Twotuples.egg-info/PKG-INFO
 Twotuples.egg-info/SOURCES.txt

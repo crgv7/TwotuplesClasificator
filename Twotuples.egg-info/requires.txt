@@ -1,10 +1,6 @@
-transformers[sentencepiece]
-transformers
-spacy
-asent
-pysentimiento
-scikit-learn
+scikit-learn>=1.0.0
 numpy
 pandas
 matplotlib
-optimum[onnxruntime]
+sentiment-analysis-spanish
+tqdm

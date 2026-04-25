@@ -1,136 +1,177 @@
-import pandas as pd
-from pysentimiento import create_analyzer
-import torch
-import torch.nn as nn
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import spacy
-import asent
 
-# Detectar si hay GPU disponible
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Dispositivo de procesamiento detectado: {device}")
+import json
+import xml.etree.ElementTree as ET
+import re
+import os
+from tqdm import tqdm
 
-def PysentimentClasificator(texts: list) -> list:
-    print("[Pysentimiento] Iniciando carga de modelo...")
-    analyzer = create_analyzer(task="sentiment", lang="es")
+NEGACIONES = {'no', 'nada', 'nunca', 'jamás', 'ni', 'tampoco', 'sin'}
+PUNTUACION_CORTE = {'.', ',', ';', '!', '?'}
+def cargar_lexico_json(path):
+    print(f"[Lexicon JSON] Cargando léxico JSON: {path}...")
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        lexicon = {str(k).lower(): float(v) for k, v in data.items()}
+        
+        # Omitimos las negaciones
+        for neg in NEGACIONES:
+            if neg in lexicon:
+                del lexicon[neg]
+                
+        print(f"[Lexicon JSON] Léxico cargado: {len(lexicon)} términos listos.")
+        return lexicon
+    except Exception as e:
+        print(f"[Lexicon JSON] Error al leer el archivo JSON: {e}")
+        return None
+
+def LexiconJSONClasificator(texts: list) -> list:
+    path_json = os.path.join(os.path.dirname(__file__), 'lexicon.json')
     
-    # Cuantización para CPU: Transforma matemática de 32bits a 8bits (Doble de rápido)
-    if device.type == 'cpu':
-        print("[Pysentimiento] Aplicando Cuantización de 8-bits (Turbo para CPU)...")
-        analyzer.model = torch.quantization.quantize_dynamic(
-            analyzer.model, {nn.Linear}, dtype=torch.qint8
-        )
+    diccionario_json = cargar_lexico_json(path_json)
+    if not diccionario_json:
+        print("[Lexicon JSON] Usando diccionario vacío como fallback.")
+        diccionario_json = {}
         
     resultados = []
-    batch_size = 64
-    total = len(texts)
+    scores = []
     
-    # Procesamiento por lotes
-    for i in range(0, total, batch_size):
-        batch = texts[i:i+batch_size]
-        try:
-            # Pysentimiento en versiones recientes acepta listas
-            outs = analyzer.predict(batch)
-            if isinstance(outs, list):
-                resultados.extend([out.output for out in outs])
-            else:
-                resultados.append(outs.output)
-        except Exception:
-            # Fallback si falla el lote
-            for text in batch:
-                out = analyzer.predict(text)
-                resultados.append(out.output)
-                
-        # Log de progreso
-        procesados = min(i + batch_size, total)
-        if procesados % (batch_size * 5) == 0 or procesados == total:
-            print(f"[Pysentimiento] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
+    print(f"[Lexicon JSON] Analizando {len(texts)} textos con Léxico JSON...")
     
-    print("[Pysentimiento] ¡Finalizado!")
-    return resultados
-
-def BertClasificator(texts: list) -> list:
-    print("[BERT] Iniciando carga de modelo ONNX (carlosrgv/bert-sentimiento-hoteles-onnx)...")
-    from optimum.onnxruntime import ORTModelForSequenceClassification
-    from transformers import AutoTokenizer, pipeline
-    
-    repo_id = "carlosrgv/bert-sentimiento-hoteles-onnx"
-    
-    # Cargar ONNX directamente desde Hugging Face
-    model = ORTModelForSequenceClassification.from_pretrained(repo_id, file_name="model_quantized.onnx")
-    tokenizer = AutoTokenizer.from_pretrained(repo_id)
-    classifier = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
-    
-    resultados = []
-    batch_size = 128 # La pipeline procesa muy rápido en CPU
-    total = len(texts)
-    
-    # Procesamiento por lotes para mantener el progreso
-    for i in range(0, total, batch_size):
-        batch = texts[i:i+batch_size]
-        # Truncar los textos a 512 para evitar errores de longitud en el tokenizador
-        batch_trunc = [str(t)[:512] for t in batch]
+    for texto in tqdm(texts, desc="Progreso del análisis", unit="txt"):
+        s = analizar_sentimiento_avanzado(str(texto), diccionario_json)
+        scores.append(s)
         
-        try:
-            # Inferir el lote
-            outs = classifier(batch_trunc)
-            
-            for out in outs:
-                label = str(out['label']).upper()
-                # Mapeo universal por si devuelve estrellas o POS/NEG directamente
-                if "1" in label or "2" in label or "NEG" in label:
-                    resultados.append('NEG')
-                elif "3" in label or "NEU" in label:
-                    resultados.append('NEU')
-                else:
-                    resultados.append('POS')
-        except Exception as e:
-            # Fallback a uno por uno si falla un lote
-            for t in batch_trunc:
-                try:
-                    out = classifier(t)[0]
-                    label = str(out['label']).upper()
-                    if "1" in label or "2" in label or "NEG" in label:
-                        resultados.append('NEG')
-                    elif "3" in label or "NEU" in label:
-                        resultados.append('NEU')
-                    else:
-                        resultados.append('POS')
-                except Exception:
-                    resultados.append('NEU')
-                
-        # Log de progreso
-        procesados = min(i + batch_size, total)
-        if procesados % (batch_size * 4) == 0 or procesados == total:
-            print(f"[BERT-ONNX] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
-                
-    print("[BERT-ONNX] ¡Finalizado!")
-    return resultados
-
-def AsentClasificator(texts: list, C=True) -> list:
-    print("[Asentimiento] Iniciando carga de SpaCy...")
-    nlp = spacy.blank('en')
-    nlp.add_pipe('sentencizer')
-    nlp.add_pipe('asent_en_v1')
-    
-    resultados = []
-    total = len(texts)
-    procesados = 0
-    
-    # spaCy usa nlp.pipe para procesar textos rápidamente en lotes
-    for doc in nlp.pipe(texts, batch_size=128):
-        compound = doc._.polarity.compound
-        if compound > 0.1:
+        if s > 0.5:
             resultados.append('POS')
-        elif compound < 0.1 and compound > 0:
-            resultados.append('NEU')
-        else:
+        elif s < -0.5:
             resultados.append('NEG')
+        else:
+            resultados.append('NEU')
+
+    print("[Lexicon JSON] ¡Finalizado!")
+    return resultados, scores
+
+def SentimentAnalysisSpanish(texts: list) -> list:
+    print("[Sentiment Analysis Spanish] Iniciando carga de modelo...")
+    from sentiment_analysis_spanish import sentiment_analysis
+    
+    sentiment = sentiment_analysis.SentimentAnalysisSpanish()
+    
+    resultados = []
+    scores = []
+    
+    print(f"[Sentiment Analysis Spanish] Analizando {len(texts)} textos...")
+    
+    for texto in tqdm(texts, desc="Progreso del análisis", unit="txt"):
+        try:
+            raw_val = sentiment.sentiment(str(texto))
             
-        procesados += 1
-        # Log de progreso
-        if procesados % 500 == 0 or procesados == total:
-            print(f"[Asentimiento] Progreso: {procesados}/{total} ({(procesados/total)*100:.1f}%)")
+            # Mapear de Probabilidad (0 a 1) a Escala de Sentimiento (-1 a 1)
+            # Para que -1 sea Negativo, 0 sea Neutro y 1 sea Positivo
+            val_mapped = (float(raw_val) * 2.0) - 1.0
+            val = round(val_mapped, 3)
             
-    print("[Asentimiento] ¡Finalizado!")
-    return resultados
+            scores.append(val)
+            
+            # Clasificación usando la nueva escala (-1 a 1)
+            if val > 0.1:
+                resultados.append('POS')
+            elif val < -0.999:
+                resultados.append('NEG')
+            else:
+                resultados.append('NEU')
+        except Exception:
+            scores.append(0.0)
+            resultados.append('NEU')
+                
+    print("[Sentiment Analysis Spanish] ¡Finalizado!")
+    return resultados, scores
+
+
+def cargar_senticon_xml(path):
+    print(f"[Senticon] Cargando léxico: {path}...")
+    try:
+        tree = ET.parse(path)
+        root = tree.getroot()
+    except Exception as e:
+        print(f"[Senticon] Error al abrir el XML: {e}")
+        return None
+
+    lexicon = {}
+    for lemma in root.iter('lemma'):
+        palabra = lemma.text
+        score_str = lemma.get('pol')
+        
+        if palabra and score_str:
+            p_limpia = palabra.strip().lower()
+            if p_limpia == 'no':
+                continue
+            lexicon[p_limpia] = float(score_str)
+
+    print(f"[Senticon] Léxico cargado: {len(lexicon)} palabras (excluyendo 'no').")
+    return lexicon
+
+def analizar_sentimiento_avanzado(texto, diccionario):
+    if not isinstance(texto, str) or texto.strip() == "":
+        return 0.0
+    
+    tokens = re.findall(r'\w+|[.,!?;]', texto.lower())
+    
+    score_total = 0.0
+    negacion_activa = False
+    ventana_negacion = 0 
+
+    for t in tokens:
+        if t in PUNTUACION_CORTE:
+            negacion_activa = False
+            ventana_negacion = 0
+            continue
+
+        if t in NEGACIONES:
+            negacion_activa = True
+            ventana_negacion = 3 
+            continue
+
+        if t in diccionario:
+            valor = diccionario[t]
+            
+            if negacion_activa and ventana_negacion > 0:
+                score_total += (valor * -1.0)
+                ventana_negacion -= 1
+            else:
+                score_total += valor
+        
+        if ventana_negacion == 0:
+            negacion_activa = False
+            
+    return score_total
+
+def SenticonClasificator(texts: list, C=True) -> list:
+    # Buscar el XML siempre dentro de la misma carpeta donde está instalado este script
+    path_xml = os.path.join(os.path.dirname(__file__), 'senticon.es.xml')
+            
+    senticon_dict = cargar_senticon_xml(path_xml)
+    if not senticon_dict:
+        print("[Senticon] Usando diccionario vacío como fallback.")
+        senticon_dict = {}
+        
+    resultados = []
+    scores = []
+    
+    print(f"[Senticon] Analizando {len(texts)} textos con lógica de negación...")
+    
+    for texto in tqdm(texts, desc="Progreso del análisis", unit="txt"):
+        s = analizar_sentimiento_avanzado(str(texto), senticon_dict)
+        scores.append(s)
+        
+        if s > 0.1:
+            resultados.append('POS')
+        elif s < -0.1:
+            resultados.append('NEG')
+        else:
+            resultados.append('NEU')
+
+    print("[Senticon] ¡Finalizado!")
+    return resultados, scores

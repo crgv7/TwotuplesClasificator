@@ -1,1 +1,3 @@
 include README.md
+recursive-include Twotuples *.xml
+recursive-include Twotuples *.json

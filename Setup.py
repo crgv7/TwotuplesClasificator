@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 HERE = pathlib.Path(__file__).parent
 
-VERSION = '1.5.2' #Muy importante, deberéis ir cambiando la versión de vuestra librería según incluyáis nuevas funcionalidades
+VERSION = '1.7.9' #Muy importante, deberéis ir cambiando la versión de vuestra librería según incluyáis nuevas funcionalidades
 PACKAGE_NAME = 'Twotuples' #Debe coincidir con el nombre de la carpeta 
 AUTHOR = 'Carlos Garcia Vargas y Orlando Toledano' #Modificar con vuestros datos
 AUTHOR_EMAIL = '' #Modificar con vuestros datos
@@ -21,16 +21,12 @@ pysentimiento
 
 #Paquetes necesarios para que funcione la libreía. Se instalarán a la vez si no lo tuvieras ya instalado
 INSTALL_REQUIRES = [
- 'transformers[sentencepiece]',
- 'transformers',
- 'spacy',
- 'asent',
- 'pysentimiento',
- 'scikit-learn',
+ 'scikit-learn>=1.0.0',
  'numpy',
  'pandas',   
  'matplotlib',
- 'optimum[onnxruntime]'
+ 'sentiment-analysis-spanish',
+ 'tqdm'
  ]
 
 setup(

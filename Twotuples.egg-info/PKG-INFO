@@ -1,22 +1,18 @@
 Metadata-Version: 2.4
 Name: Twotuples
-Version: 1.5.2
+Version: 1.7.9
 Summary: Libreria para clasificar texto
 Home-page: https://github.com/crgv7/TwotuplesClasificator
 Author: Carlos Garcia Vargas y Orlando Toledano
 Author-email: 
 License: MIT
 Description-Content-Type: text/markdown
-Requires-Dist: transformers[sentencepiece]
-Requires-Dist: transformers
-Requires-Dist: spacy
-Requires-Dist: asent
-Requires-Dist: pysentimiento
-Requires-Dist: scikit-learn
+Requires-Dist: scikit-learn>=1.0.0
 Requires-Dist: numpy
 Requires-Dist: pandas
 Requires-Dist: matplotlib
-Requires-Dist: optimum[onnxruntime]
+Requires-Dist: sentiment-analysis-spanish
+Requires-Dist: tqdm
 Dynamic: author
 Dynamic: description
 Dynamic: description-content-type

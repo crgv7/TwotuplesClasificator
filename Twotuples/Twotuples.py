@@ -18,14 +18,13 @@ pip install optimum[onnxruntime]
 '''
 """
 import pandas as pd
-import torch
-import multiprocessing
+
 
 # Importando funciones refactorizadas
 from .classifiers import (
-    PysentimentClasificator,
-    BertClasificator,
-    AsentClasificator
+    LexiconJSONClasificator,
+    SentimentAnalysisSpanish,
+    SenticonClasificator
 )
 
 from .fuzzy_logic import (
@@ -46,13 +45,6 @@ from .utils import (
 
 def difuso_clasificator(data:str, ColumnName:str, C=False, limite:int=None):
   pd.set_option('future.no_silent_downcasting', True)
-  
-  # --- OPTIMIZACIÓN DE CPU EXTREMA ---
-  # Al ejecutar en modo secuencial, le damos TODO el procesador a PyTorch 
-  # para que acelere la inferencia de Pysentimiento y BERT sin interrupciones.
-  cores = multiprocessing.cpu_count()
-  torch.set_num_threads(cores)
-  print(f"\n[SISTEMA] Turbo CPU Activado: PyTorch usará el 100% de la CPU ({cores} núcleos).")
   
   print(f"[SISTEMA] Cargando datos desde {data}...")
   df = pd.read_excel(data, sheet_name='Sheet1')
@@ -75,27 +67,42 @@ def difuso_clasificator(data:str, ColumnName:str, C=False, limite:int=None):
 
   print("[SISTEMA] Iniciando clasificación SECUENCIAL (Para evitar saturación de CPU)...")
   
-  # Ejecución Secuencial: Mucho más rápida en CPU que paralela para redes neuronales
-  clasif_asent_unicos = AsentClasificator(textos_unicos, C)
-  clasif_bert_unicos = BertClasificator(textos_unicos)
-  clasif_pysentimiento_unicos = PysentimentClasificator(textos_unicos)
+  # Ejecución Secuencial
+  clasif_senticon_unicos, scores_senticon_unicos = SenticonClasificator(textos_unicos, C)
+  clasif_sentiment_unicos, scores_sentiment_unicos = SentimentAnalysisSpanish(textos_unicos)
+  clasif_lexicon_unicos, scores_lexicon_unicos = LexiconJSONClasificator(textos_unicos)
       
   print("\n[SISTEMA] Clasificación terminada. Mapeando resultados...")
 
   # --- MAPEAR RESULTADOS A TODOS LOS DATOS ---
-  dict_pysentiment = dict(zip(textos_unicos, clasif_pysentimiento_unicos))
-  dict_bert = dict(zip(textos_unicos, clasif_bert_unicos))
-  dict_asent = dict(zip(textos_unicos, clasif_asent_unicos))
+  dict_lexicon = dict(zip(textos_unicos, clasif_lexicon_unicos))
+  dict_sentiment = dict(zip(textos_unicos, clasif_sentiment_unicos))
+  dict_senticon = dict(zip(textos_unicos, clasif_senticon_unicos))
   
-  clasif_pysentimiento = [dict_pysentiment[t] for t in textos_completos]
-  clasif_bert = [dict_bert[t] for t in textos_completos]
-  clasif_asent = [dict_asent[t] for t in textos_completos]
+  dict_lexicon_scores = dict(zip(textos_unicos, scores_lexicon_unicos))
+  dict_sentiment_scores = dict(zip(textos_unicos, scores_sentiment_unicos))
+  dict_senticon_scores = dict(zip(textos_unicos, scores_senticon_unicos))
+  
+  clasif_lexicon = [dict_lexicon[t] for t in textos_completos]
+  clasif_sentiment = [dict_sentiment[t] for t in textos_completos]
+  clasif_senticon = [dict_senticon[t] for t in textos_completos]
+
+  scores_lexicon = [dict_lexicon_scores[t] for t in textos_completos]
+  scores_sentiment = [dict_sentiment_scores[t] for t in textos_completos]
+  scores_senticon = [dict_senticon_scores[t] for t in textos_completos]
 
   # Crear DataFrame con los resultados
   df_select = pd.DataFrame({
-      'clasificacion_pysentimiento': clasif_pysentimiento,
-      'Clasificacion_Bert': clasif_bert,
-      'Clasificacion_Asentiment': clasif_asent
+      'Clasificacion_Lexico_JSON': clasif_lexicon,
+      'Clasificacion_Sentiment_Spanish': clasif_sentiment,
+      'Clasificacion_Senticon_XML': clasif_senticon
+  })
+  
+  # Crear DataFrame con los scores numéricos
+  df_scores = pd.DataFrame({
+      'Score_Lexicon_JSON': scores_lexicon,
+      'Score_Sentiment_Spanish': scores_sentiment,
+      'Score_Senticon_XML': scores_senticon
   })
   
   # Sustituir etiquetas por valores numéricos
@@ -121,7 +128,8 @@ def difuso_clasificator(data:str, ColumnName:str, C=False, limite:int=None):
   print(f"[SISTEMA] Guardando resultados finales en 'score_diffuse.xlsx'...")
   difuso = pd.DataFrame({'Clasicacion_Difusa': var})
   
-  final = pd.concat([df, df2, difuso], axis=1)
+  # Añadir df2 (etiquetas numéricas 2,1,0 para las métricas) y df_scores (números decimales reales) al excel final
+  final = pd.concat([df, df2, df_scores, difuso], axis=1)
   final.to_excel('score_diffuse.xlsx')
   
   print("[SISTEMA] Calculando métricas (score)...")

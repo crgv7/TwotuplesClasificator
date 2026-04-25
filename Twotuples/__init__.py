@@ -1,2 +1,2 @@
-from .Twotuples import PysentimentClasificator, BertClasificator, AsentClasificator, difuso_clasificator, Metric
+from .Twotuples import LexiconJSONClasificator, SentimentAnalysisSpanish, SenticonClasificator, difuso_clasificator, Metric
 

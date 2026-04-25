@@ -22,9 +22,9 @@ def ExcelConcat():
 def score(df:pd):
   score=df
   score['Clasificacion_Difusa']=score['Clasicacion_Difusa'].replace([4,3,2,1,0],['POS','POS','NEU','NEG','NEG'])
-  score['clasificacion_pysentimiento']=score['clasificacion_pysentimiento'].replace([2,1,0],['POS','NEU','NEG'])
-  score['Clasificacion_Bert']=score['Clasificacion_Bert'].replace([2,1,0],['POS','NEU','NEG'])
-  score['Clasificacion_Asentiment']=score['Clasificacion_Asentiment'].replace([2,1,0],['POS','NEU','NEG'])
+  score['Clasificacion_Lexico_JSON']=score['Clasificacion_Lexico_JSON'].replace([2,1,0],['POS','NEU','NEG'])
+  score['Clasificacion_Sentiment_Spanish']=score['Clasificacion_Sentiment_Spanish'].replace([2,1,0],['POS','NEU','NEG'])
+  score['Clasificacion_Senticon_XML']=score['Clasificacion_Senticon_XML'].replace([2,1,0],['POS','NEU','NEG'])
   score.to_excel('score.xlsx')
 
 def Metric(etiqueta:str, metric:str='ClassificationReport', sorter:str='difuse', ClassNumber:int=3 ):
@@ -37,12 +37,12 @@ def Metric(etiqueta:str, metric:str='ClassificationReport', sorter:str='difuse',
     # Generar datos de ejemplo de etiquetas reales y predichas
     print('hola', ClassNumber)
     actual = df[etiqueta]
-    if sorter=='pysentiment' :
-        predicted = df['clasificacion_pysentimiento']
-    elif sorter=='bert':
-      predicted = df['Clasificacion_Bert']
-    elif  sorter=='asent':
-      predicted = df['Clasificacion_Asentiment']
+    if sorter=='lexicon' or sorter=='lexico_json':
+        predicted = df['Clasificacion_Lexico_JSON']
+    elif sorter=='sentiment' or sorter=='sentiment_spanish':
+      predicted = df['Clasificacion_Sentiment_Spanish']
+    elif  sorter=='senticon' or sorter=='senticon_xml':
+      predicted = df['Clasificacion_Senticon_XML']
     else:
         predicted = df['Clasicacion_Difusa']
     # Crear la matriz de confusión utilizando sklearn
@@ -58,12 +58,12 @@ def Metric(etiqueta:str, metric:str='ClassificationReport', sorter:str='difuse',
 
   def ClassificationReport(df:pd, etiqueta:str, sorter='difuse', ClassNumber=3):
     actual = df[etiqueta]
-    if sorter=='pysentiment' :
-        predicted = df['clasificacion_pysentimiento']
-    elif sorter=='bert':
-      predicted = df['Clasificacion_Bert']
-    elif  sorter=='asent':
-      predicted = df['Clasificacion_Asentiment']
+    if sorter=='lexicon' or sorter=='lexico_json':
+        predicted = df['Clasificacion_Lexico_JSON']
+    elif sorter=='sentiment' or sorter=='sentiment_spanish':
+      predicted = df['Clasificacion_Sentiment_Spanish']
+    elif  sorter=='senticon' or sorter=='senticon_xml':
+      predicted = df['Clasificacion_Senticon_XML']
     else:
         predicted = df['Clasicacion_Difusa']
 
